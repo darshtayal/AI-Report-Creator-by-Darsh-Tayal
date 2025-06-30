@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+
+# imports
 from langgraph.graph import StateGraph, START, END
 from pydantic import BaseModel, Field
 from langchain_groq import ChatGroq
@@ -19,17 +21,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import tempfile
 
-def invoke_llm(message):
-    llm = ChatGroq(model='llama-3.1-8b-instant')
-    response = llm.invoke([HumanMessage(content=message)])
-    return response
-
-def invoke_big_llm(message):
-    llm = ChatGroq(model='meta-llama/llama-4-scout-17b-16e-instruct')
-    response = llm.invoke([HumanMessage(content=message)])
-    return response
-    
-
+# define the state of the gragh
 class State(TypedDict):
     report_title: str
     report_reason: str
@@ -40,7 +32,8 @@ class State(TypedDict):
     current_title: str
     current_description: str
     completed_sections: Annotated[List, operator.add]
-    
+
+# define the other classes for llms to give structured outputs
 class Section(BaseModel):
     title: str = Field(description='This is the title of the subsection')
     description: str = Field(description="This is short summary of the section")
@@ -48,21 +41,37 @@ class Sections(BaseModel):
     plan: List[Section]
 class Creator(BaseModel):
     questions: List[str] = Field(description="Exactly 2 to 3 questions for researching the subtopic.")
-    
+
+# function to invoke a general llm
+def invoke_llm(message):
+    llm = ChatGroq(model='llama-3.1-8b-instant')
+    response = llm.invoke([HumanMessage(content=message)])
+    return response
+
+# function to invoke a large parameter llm for complex and lengthy tasks
+def invoke_big_llm(message):
+    llm = ChatGroq(model='meta-llama/llama-4-scout-17b-16e-instruct')
+    response = llm.invoke([HumanMessage(content=message)])
+    return response
+
+# function to invoke the planner llm for report planning tasks
 def plannerllm(message):
     llm = ChatGroq(model='llama-3.1-8b-instant')
     so_llm = llm.with_structured_output(Sections)
     response = so_llm.invoke([HumanMessage(content=message)])
     return response
 
+# function to invoke the creator llm for question creation task
 def creator_llm(message):
     llm = ChatGroq(model='llama-3.1-8b-instant')
     crea_llm = llm.with_structured_output(Creator)
     response = crea_llm.invoke([HumanMessage(content=message)])
     return response
-   
+
+# initializing web search
 search = DuckDuckGoSearchResults(output_format="list")
 
+# This is the 1st Node for the graph. Here we plan the full report.
 def planner(state: State):    
     prompt = f"""
 You are an expert report planner. Your job is to produce a JSON list of section objects for a report.
@@ -83,7 +92,8 @@ Create a report plan for the company "{state['company_name']}", titled "{state['
 
     res = plannerllm(prompt)
     return {'report_plan': res.plan}
-    
+
+# define a function to clean the data recieved from the web
 def clean_web_text(text: str) -> str:
     text = re.sub(r'<[^>]+>', '', text)
     text = re.sub(r'<(script|style).*?>.*?</\1>', '', text, flags=re.DOTALL)
@@ -94,7 +104,8 @@ def clean_web_text(text: str) -> str:
         text = text.replace(kw, '')
     text = text.strip()
     return text
-    
+
+# This is the Node which generates each subsection for the report.
 def subsection_generator(state:State):
     prompt = f"We are creating a subsection of the report on the topic {state['report_title']}. The goal of our report is to make a decision about {state['report_reason']}. We have to search the internet to gather the information about the subtopic '{state['current_title']}' which have a description '{state['current_description']}'. So design 2-3 strong questions and sentences so that we can gather detailed information about it."
     res = creator_llm(prompt)
@@ -103,7 +114,7 @@ def subsection_generator(state:State):
         link_list = []
         text = []
         question_info = ""
-        time.sleep(60)
+        time.sleep(60) # Pause 60s between queries to avoid rate limiting (DuckDuckGo and GROQ API)
         info = search.invoke(question)
         for sub in info:
             link_list.append(sub['link'])
@@ -116,7 +127,6 @@ def subsection_generator(state:State):
             docs = clean_web_text(docs[0].page_content)
             avg_tokens = 1.4 * len(docs.split(" "))
             if avg_tokens > 5940:
-                
                 pass
             else:
                 prompt = f"Please summarize the following website text in 1 paragraph of important information. Ignore all the stuff that's irrelevent. Include only the important facts and figures. Reply only with the summary and nothing else, not even here's the summary and all. Here's the text: {docs}"
@@ -147,12 +157,11 @@ def subsection_generator(state:State):
     else:
         trimmed_text = final_text        
     all_info = '\n'.join(trimmed_text)
-
-    
     final_subsection_prompt = f"Please summarize this text into 5-6 paragraphs. Return only the summary. Avoid any extra explanation or formatting:\n{all_info}"
     final_subsection = invoke_big_llm(final_subsection_prompt)
     return {'completed_sections': [final_subsection], 'no_of_subsections':state['no_of_subsections']+1}
-    
+
+# This node will take subsections from the planner and assign them to the subsection generator sequencially
 def assigner(state:State):
     planner_list = state['report_plan']
     target_id = state['no_of_subsections']
@@ -160,7 +169,8 @@ def assigner(state:State):
     cur_title = target_subsection.title
     cur_description = target_subsection.description
     return {'current_title': cur_title, 'current_description': cur_description} 
-    
+
+# This node will be used by langgraph to redirect the flow back to subsection generator from assigner and visa versa. Also, when the full report will be generated, it will redirect the flow towards the final node, compiler.
 def smart_assigner(state:State):
     rp_len = len(state['report_plan'])
     cur_len = state['no_of_subsections']
@@ -168,9 +178,9 @@ def smart_assigner(state:State):
         return 'assigner'
     else:
         return 'compiler'
-        
-def compiler(state:State):
 
+# This node will take in all the generated subsections in the form of list and compile them into a single report.
+def compiler(state:State):
     title_list = []
     content_list = []
     for plan in state['report_plan']:
@@ -181,14 +191,17 @@ def compiler(state:State):
         content_list.append(f"**{info.content}**")
     final_rep = "\n\n --- \n\n".join(content_list)
     return {'final_report':final_rep} 
-                            
+
+# And here we start building the graph!
 builder = StateGraph(State)
 
+# We first add all the nessasary nodes
 builder.add_node('planner', planner)
 builder.add_node('subsection_generator', subsection_generator)
 builder.add_node('compiler', compiler)
 builder.add_node("assigner", assigner)
 
+# Connect nodes to define the flow of report generation using LangGraph 
 builder.add_edge(START, 'planner')
 builder.add_edge('planner','assigner')
 builder.add_edge('assigner','subsection_generator')
@@ -196,8 +209,10 @@ builder.add_conditional_edges('subsection_generator', smart_assigner,
                              {'assigner': 'assigner', 'compiler': 'compiler'})
 builder.add_edge('compiler', END)
 
+# We then compile the graph
 graph = builder.compile()
 
+# We create functions for gradio, this is initializer to check the API key
 def initializer(api_key):
     os.environ['GROQ_API_KEY'] = api_key
     llm_tester = ChatGroq(model="gemma2-9b-it")
@@ -207,11 +222,13 @@ def initializer(api_key):
         return gr.update(visible=True), gr.update(visible=False), gr.update(visible=True)
     return gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
 
+# This function will call the graph 
 def get_markdown_text(rp_title, company, rp_reason):
     mess = {'report_title':rp_title, 'company_name':company, 'report_reason':rp_reason, 'no_of_subsections':0}
     res = graph.invoke(mess)
     return res['final_report'].split('\n')
-    
+
+# This function will convert the report into a PDF
 def markdown_to_pdf(rp_title, company, rp_reason):
     yield gr.update(visible=False), gr.update(visible=True), gr.update(visible=False), None, gr.update(visible=False)
     try:
@@ -232,6 +249,7 @@ def markdown_to_pdf(rp_title, company, rp_reason):
     c.save()
     yield gr.update(visible=True), gr.update(visible=False), f"✅ Your report '{filename}' is ready! Thank you! Send feedback to darshtayal8@gmail.com.", pdf_path, gr.update(visible=True)
 
+# And here we built the gradio UI!
 with gr.Blocks() as ui:
     api_key_valid = gr.State(value=True)
     with gr.Column(visible=True) as extractor:
@@ -270,5 +288,5 @@ with gr.Blocks() as ui:
     submit.click(fn=initializer, inputs=[key], outputs = [extractor, creator, api_error_msg])
     sub.click(fn = markdown_to_pdf, inputs=[title, company, reason], outputs=[creator, processing_page, result, download_btn, final_page])
 
-    
+# And boom! We launch the app. 
 ui.launch()
