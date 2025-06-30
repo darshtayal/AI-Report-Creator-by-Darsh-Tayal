@@ -73,4 +73,20 @@ graph TD
     D -->|if sections left| C
     D -->|else| E[Compiler: Build Final Report]
     E --> F[Output PDF]
+---
+
+## 📜 License
+
+MIT License
+
+---
+
+## 📬 Contact
+
+For freelance or collaboration opportunities:  
+📧 darshtayal8@gmail.com  
+🌐 [LinkedIn](https://www.linkedin.com/in/your-link-if-you-have-one)
+
+---
+
 
