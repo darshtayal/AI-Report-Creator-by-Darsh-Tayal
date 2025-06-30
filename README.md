@@ -73,6 +73,7 @@ graph TD
     D -->|if sections left| C
     D -->|else| E[Compiler: Build Final Report]
     E --> F[Output PDF]
+
 ---
 
 ## 📜 License
@@ -88,5 +89,3 @@ For freelance or collaboration opportunities:
 🌐 [LinkedIn](https://www.linkedin.com/in/your-link-if-you-have-one)
 
 ---
-
-
