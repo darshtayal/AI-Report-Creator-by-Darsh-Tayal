@@ -28,13 +28,6 @@ Built by **Darsh Tayal**, this project showcases how stateful AI pipelines can b
 
 ---
 
-## 📎 Example Output
-
-> ✅ [Click here to see a sample report PDF](https://huggingface.co/spaces/Darsh1234Tayal/AI_Report_Creator_by_Darsh_Tayal/blob/main/sample_output.pdf)  
-> *(This link will work once you upload a sample PDF to your space repo)*
-
----
-
 ## 🔐 How to Use
 
 ### 1. Get a FREE Groq API Key  
