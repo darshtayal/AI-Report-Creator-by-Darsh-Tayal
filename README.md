@@ -66,3 +66,9 @@ graph TD
     D -->|if sections left| C
     D -->|else| E[Compiler: Build Final Report]
     E --> F[Output PDF]
+
+---
+
+## ✨ Contact me
+
+- Please e-mail me at darshtayal8@gmail.com 
