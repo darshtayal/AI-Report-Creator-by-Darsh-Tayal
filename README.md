@@ -67,11 +67,17 @@ The entire system is managed as a LangGraph state machine:
 
 ```
 
-mermaid
-graph TD
-    A[Start] --> B[Planner: Create Section Plan]
-    B --> C[Assigner: Pick One Subsection]
-    C --> D[Subsection Generator: Search, Summarize, Clean]
-    D -->|if sections left| C
-    D -->|else| E[Compiler: Build Final Report]
-    E --> F[Output PDF]
+```markdown
+Start
+  ↓
+Planner: Create Section Plan
+  ↓
+Assigner: Pick One Subsection
+  ↓
+Subsection Generator: Search, Summarize, Clean
+  ↓
+(If sections left → back to Assigner)
+  ↓
+Compiler: Build Final Report
+  ↓
+Output PDF
