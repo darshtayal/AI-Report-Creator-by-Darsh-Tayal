@@ -54,11 +54,20 @@ Your report will be ready in **10–15 minutes** and available for **download as
 
 ---
 
+## ✨ Contact me
+
+- Please e-mail me at darshtayal8@gmail.com
+
+---
+
+
 ## 🛠️ How It Works (For Developers)
 
 The entire system is managed as a LangGraph state machine:
 
-```mermaid
+```
+
+mermaid
 graph TD
     A[Start] --> B[Planner: Create Section Plan]
     B --> C[Assigner: Pick One Subsection]
@@ -66,9 +75,3 @@ graph TD
     D -->|if sections left| C
     D -->|else| E[Compiler: Build Final Report]
     E --> F[Output PDF]
-
----
-
-## ✨ Contact me
-
-- Please e-mail me at darshtayal8@gmail.com 
